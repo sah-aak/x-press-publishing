@@ -1,14 +1,13 @@
 const express=require('express');
 const seriesRouter=express.Router({mergeParams:true});
 const sqlite3=require('sqlite3');
-const db=new sqlite3.Database('./database.sqlite');
+const db=new sqlite3.Database(process.env.TEST_DATABASE || './database.sqlite');
 
 const issueRouter=require('./issues');
 
-seriesRouter.use('/:seriesId/issues',issueRouter);
 
 seriesRouter.param('seriesId',(req,res,next,id)=>{
-    db.get('select * from Series where id=$id',{$id:Number(id)},(err,row)=>{
+    db.get('SELECT * FROM Series WHERE id=$id',{$id:Number(seriesId)},(err,row)=>{
         if(err)
             next(err);    
         
@@ -26,17 +25,20 @@ seriesRouter.param('seriesId',(req,res,next,id)=>{
     })
 });
 
+seriesRouter.use('/:seriesId/issues',issueRouter);
+
 seriesRouter.get('/',(req,res,next)=>{
-    db.all('select * from Series;',(err,row)=>{
+    db.all('SELECT * FROM Series',(err,rows)=>{
         if(err)
         {
             next(err);
         }
         else{
-            res.status(200).json({series:row});
+            res.status(200).json({series:rows});
         }
     });
 });
+
 
 seriesRouter.get('/:seriesId',(req,res,next)=>{
     res.status(200).send({series:req.series});
@@ -49,19 +51,20 @@ seriesRouter.post('/',(req,res,next)=>{
     {
         res.status(400).send();
     }
-    db.run('insert into Series (name,description) values($name,$description);',{$name:obj.series.name,$description:obj.series.description},function(err){
-        if(err)
-            next(err);
-        else{
-            db.get('select * from Artist where id=$lastid',{$lastid:this.lastID},(err,row)=>{
-                if(err)
+    db.serialize(()=>{
+        db.run('INSERT INTO Series (name,description) VALUES($name,$description);',{$name:obj.series.name,$description:obj.series.description},function(err){
+            if(err)
+                next(err);
+        });
+         db.get('SELECT * FROM Artist WHERE id=$lastid',{$lastid:this.lastID},(err,row)=>{
+            if(err)
                     next(err);
-                else{
+            else{
                     res.status(201).json({series:row});
                 }
-            });
-        }
+        });
     });
+   
 });
 
 seriesRouter.put('/:seriesId',(req,res,next)=>{
@@ -70,14 +73,14 @@ seriesRouter.put('/:seriesId',(req,res,next)=>{
     {
         res.status(400).send();
     }
-    db.run('update Series set name=$name,description=$description where id=$id',{$name:req.body.series.name,$description:req.body.series.description,$id:req.params.seriesId},function(error){
+    db.run('UPDATE Series SET name=$name,description=$description WHERE id=$id',{$name:req.body.series.name,$description:req.body.series.description,$id:req.params.seriesId},function(error){
         if(error)
         {
             next(error);
         }
 
         else{
-            db.get('select * from Series where id=$id',{$id:this.lastID},(err,row)=>{
+            db.get('SELECT * FROM Series WHERE id=$id',{$id:this.lastID},(err,row)=>{
                 if(err)
                     next(err);
                 else{
@@ -89,7 +92,7 @@ seriesRouter.put('/:seriesId',(req,res,next)=>{
 });
 
 issueRouter.get('/',(req,res,next)=>{
-    db.all('select * from Issues where series_id=$id',{$id:req.params.seriesId},(err,row)=>{
+    db.all('SELECT * FROM Issues WHERE series_id=$id',{$id:req.params.seriesId},(err,row)=>{
         if(err)
         {
             next(err);
@@ -106,16 +109,16 @@ issueRouter.post('/',(req,res,next)=>{
     {
         res.status(400).send();
     }
-    db.get('select * from Artist where id=$id',{$id:obj.artistId},(err,row)=>{
+    db.get('SELECT * FROM Artist WHERE id=$id',{$id:obj.artistId},(err,row)=>{
         if(err)
             next(err);
         else if(row){
-            db.run('insert into Issue (name,issueNumber,publicationDate,artistId,seriesId) values($name,$issueNumber,$publicationDate,$artistId,$seriesId);',{$name:obj.name,$issueNumber:obj.issueNumber,$publicationDate:obj.publicationDate,$artistId:obj.artistId,$seriesId:req.params.seriesId},
+            db.run('INSERT INTO Issue (name,issueNumber,publicationDate,artistId,seriesId) VALUES($name,$issueNumber,$publicationDate,$artistId,$seriesId);',{$name:obj.name,$issueNumber:obj.issueNumber,$publicationDate:obj.publicationDate,$artistId:obj.artistId,$seriesId:req.params.seriesId},
             function(err){
                 if(err)
                     next(err);
                 else{
-                    db.get('select * from Issue where id=$id',{$id:this.lastID},(err,row)=>{
+                    db.get('SELECT * FROM Issue WHERE id=$id',{$id:this.lastID},(err,row)=>{
                         if(err)
                             next(err);
                         else
@@ -131,7 +134,7 @@ issueRouter.post('/',(req,res,next)=>{
 });
 
 issueRouter.param('issueId',(req,res,next,id)=>{
-    db.get('select * from Issue where id=$id',{$id:req.params.issueId},(err,row)=>{
+    db.get('SELECT * FROM Issue WHERE id=$id',{$id:req.params.issueId},(err,row)=>{
         if(err)
             next(err);
         else if(row){
@@ -149,18 +152,18 @@ issueRouter.put('/:issueId',(req,res,next)=>{
     {
         res.status(400).send();
     }
-    db.get('select * from Issues where id=$id',{$id:req.params.issueId},(err,row)=>{
+    db.get('SELECT * FROM Issues WHERE id=$id',{$id:req.params.issueId},(err,row)=>{
         if(err){
             next(err);
         }
         else if(row){
-            db.run('update Issues set name=$name,issueNumber=$issueNumber,publicationDate=$publicationDate,artistId=$artistId,seriesId=$seriesId where id=$issueId;',
+            db.run('UPDATE Issues SET name=$name,issueNumber=$issueNumber,publicationDate=$publicationDate,artistId=$artistId,seriesId=$seriesId WHERE id=$issueId;',
             {$name:obj.name,$issueNumber:obj.issueNumber,$publicationDate:obj.publicationDate,$artistId:obj.artistId,$seriesId},
             function(err){
                 if(err)
                     next(err);
                 else{
-                    db.get('select * from Issues where id=$id',{$id:this.lastID},(err,row)=>{
+                    db.get('SELECT * FROM Issues WHERE id=$id',{$id:this.lastID},(err,row)=>{
                         if(err)
                             next(err);
                         else{
@@ -178,12 +181,12 @@ issueRouter.put('/:issueId',(req,res,next)=>{
 });
 
 issueRouter.delete('/:issueId',(req,res,next)=>{
-    db.get('select * from Issue where id=$id',{$id:req.params.issueId},(err,row)=>{
+    db.get('SELECT * FROM Issue WHERE id=$id',{$id:req.params.issueId},(err,row)=>{
         if(err)
             next(err);
         else{
             if(row){
-                db.run('delete from Issue where id=$id',{$id:req.params.issueId},function(err){
+                db.run('DELETE FROM Issue WHERE id=$id',{$id:req.params.issueId},function(err){
                     if(err)
                         next(err);
                     else 
@@ -198,7 +201,7 @@ issueRouter.delete('/:issueId',(req,res,next)=>{
 });
 
 seriesRouter.delete('/:seriesId',(req,res,next)=>{
-    db.get('select * from Issues where seriesId=$seriesid',{$seriesid:req.params.seriesId},(err,row)=>{
+    db.get('SELECT * FROM Issues WHERE seriesId=$seriesid',{$seriesid:req.params.seriesId},(err,row)=>{
         if(err)
             next(err);
         else{

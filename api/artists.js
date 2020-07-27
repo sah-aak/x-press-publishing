@@ -1,7 +1,7 @@
 const express=require('express');
 const artist=express.Router({mergeParams:true});
 const sqlite3=require('sqlite3');
-const db=new sqlite3.Database(process.env.TEST_DATABASE||'./database.sqlite');
+const db=new sqlite3.Database(process.env.TEST_DATABASE||'../database.sqlite');
 
 
 
@@ -67,34 +67,35 @@ artist.put('/:artistId',(req,res,next)=>{
     {
         res.status(400).send();
     }
-    db.serialize(()=>{
         db.run('update Artist set name=$name,date_of_birth=$dob,biography=$biography,is_currently_employed=$iscurremp where id=$id',
         {$name:obj.artist.name,$dob:obj.artist.dateOfBirth,$biography:obj.artist.biography,$iscurremp:obj.artist.isCurrentlyEmployed,$id:Number(req.params.artistId)},
         function(error){
         if(error)
         {
             next(error);
-        }    
+        }   
+        else{
+            db.get('select * from Artist where id=$id',{$id:Number(req.params.artistId)},(err,row)=>{
+                if(err)next(err);  
+                res.status(200).json({"artist":row});
+            });
+        } 
     });
-    db.get('select * from Artist where id=$id',{$id:this.lastID},(err,row)=>{
-            
-        res.status(200).json({artist:row});
-    });
-    });
+    
+    
     
 });
 
 artist.delete('/:artistId',(req,res,next)=>{
     db.run('update Artist set is_currently_employed = 0 where id=$id',{$id:req.params.artistId},function(err){
-        if(error)
+        if(err)
         {
-            next(error);
+            next(err);
         }
         else{
-            db.get('select * from Artist where id=$id',{$id:this.lastID},(err,row)=>{
-            
-                    res.status(200).json({artist:row});
-                
+            db.get('select * from Artist where id=$id',{$id:req.params.artistId},(err,row)=>{
+                    if(err)next(err);
+                    res.status(200).json({artist:row});   
             });
         }
 

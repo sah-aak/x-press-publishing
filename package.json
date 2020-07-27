@@ -7,7 +7,7 @@
     "test": "mocha",
     "start": "node server.js"
   },
-  "author": "",
+  "author": "AAKRITI SAHRAWAT",
   "license": "ISC",
   "dependencies": {
     "body-parser": "^1.19.0",
